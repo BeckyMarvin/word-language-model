@@ -293,7 +293,8 @@ def test_evaluate(test_sentences, data_source):
         else:
             hidden = model.init_hidden(1) # number of parallel sentences being processed
         data, targets = test_get_batch(sent_ids, evaluation=True)
-        data=data.unsqueeze(1) # only needed if there is just a single sentence being processed 
+        data=data.unsqueeze(1) # only needed if there is just a single sentence being processed
+        print data
         output, hidden = model(data, hidden)
         output_flat = output.view(-1, ntokens)
         curr_loss = criterion(output_flat, targets).data
