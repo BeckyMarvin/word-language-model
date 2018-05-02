@@ -38,7 +38,7 @@ class Dictionary(object):
         if tag not in self.tag2idx:
             self.idx2tag.append(tag)
             self.tag2idx[tag] = len(self.idx2tag) - 1
-        return self.tag2idx[word]
+        return self.tag2idx[tag]
 
     def __len__(self):
         return len(self.idx2word)

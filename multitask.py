@@ -9,6 +9,7 @@ import data
 import model
 import sys
 import numpy as np
+import random
 #import Decimal #TODO: need to install Decimal
 
 sys.stderr.write('Libraries loaded\n')
@@ -108,14 +109,25 @@ if torch.cuda.is_available():
 
 def batchify(data, bsz):
     # Work out how cleanly we can divide the dataset into bsz parts.
-    nbatch = data.size(0) // bsz
-    # Trim off any extra elements that wouldn't cleanly fit (remainders).
-    data = data.narrow(0, 0, nbatch * bsz)
+    if isinstance(data, tuple):
+        nbatch = data[0].size(0) // bsz
+        # Trim off any extra elements that wouldn't cleanly fit (remainders).
+        tag_data = data[1].narrow(0, 0, nbatch * bsz)
+        data = data[0].narrow(0, 0, nbatch * bsz)
+        # Evenly divide the data across the bsz batches.
+        tag_data = tag_data.view(bsz, -1).t().contiguous()
+    else:
+        nbatch = data.size(0) // bsz
+        # Trim off any extra elements that wouldn't cleanly fit (remainders).
+        data = data.narrow(0, 0, nbatch * bsz)
+    
     # Evenly divide the data across the bsz batches.
     data = data.view(bsz, -1).t().contiguous()
     # Turning the data over to CUDA at this point may lead to more OOM errors
     #if args.cuda:
      #    data = data.cuda()
+    if isinstance(data,tuple):
+        return data, tag_data
     return data
     
 eval_batch_size = 10
@@ -259,7 +271,7 @@ def repackage_hidden(h):
 # to the seq_len dimension in the LSTM.
     
 def test_get_batch(source, evaluation=False):
-    if len(source) == 2:
+    if isinstance(source, tuple):
         seq_len = len(source[0]) - 1
         data = Variable(source[0][:seq_len], volatile=evaluation)
         target = Variable(source[1][:seq_len], volatile=evaluation)
@@ -275,7 +287,7 @@ def test_get_batch(source, evaluation=False):
         return data, target
     
 def get_batch(source, i, evaluation=False):
-    if len(source) == 2:
+    if isinstance(source, tuple):
         seq_len = min(args.bptt, len(source[0]) - 1 - i)
         data = Variable(source[0][i:i+seq_len], volatile=evaluation)
         target = Variable(source[1][i:i+seq_len].view(-1))
@@ -338,7 +350,7 @@ def test_evaluate(test_lm_sentences, test_ccg_sentences, lm_data_source, ccg_dat
         hidden = repackage_hidden(hidden)
         bar.next()
     bar.finish()
-    return total_loss[0] / len(data_source)
+    return total_loss[0] / (len(lm_data_source)+len(ccg_data_source))
 
 def evaluate(lm_data_source, ccg_data_source):
     # Turn on evaluation mode which disables dropout.
@@ -353,7 +365,7 @@ def evaluate(lm_data_source, ccg_data_source):
     for i in range(0, lm_data_source.size(0) + ccg_data_source.size(0) - 1, args.bptt):
         # TAG
         if i > lm_data_source.size(0):
-            data, targets = get_batch(ccg_datasource, i - lm_data_source.size(0), evaluation=True)
+            data, targets = get_batch(ccg_data_source, i - lm_data_source.size(0), evaluation=True)
         # LM
         else:
             data, targets = get_batch(lm_data_source, i, evaluation=True)
@@ -362,7 +374,7 @@ def evaluate(lm_data_source, ccg_data_source):
         curr_loss = len(data) * criterion(output_flat, targets).data
         total_loss += curr_loss
         hidden = repackage_hidden(hidden)
-    return total_loss[0] / len(data_source)
+    return total_loss[0] / (len(lm_data_source)+len(ccg_data_source))
 
 
 def train():
